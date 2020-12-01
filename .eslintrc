@@ -1,0 +1,9 @@
+{
+    "root": true,
+    "extends": [
+        "@partkit"
+    ],
+    "env": {
+        "node": true
+    }
+}

@@ -34,8 +34,8 @@ export const HELP: CommandHandler<OptionDefinitionList> = (parser) => {
         .map(([name, option]) => formatOption({ ...option, name }))
         .join('\n');
 
-    console.log(usage);
-    console.log(options);
+    console.log(`\n${ usage }`);
+    console.log(`\n${ options }\n`);
 };
 
 export const HELP_COMMAND = command({

@@ -14,7 +14,7 @@ import { VERSION_COMMAND } from './commands/version';
 import { isFlag, LONG_FLAG_PREFIX, SHORT_FLAG_PREFIX } from './flag';
 import { Option, OptionDefinition, OptionDefinitionList } from './option';
 
-// TODO: extract errors (maybe include parser error, so it can be handled in run method)
+// TODO: extract errors
 // TODO: allow inferring shared command names from CommandDefinitionList
 
 export interface CliParserResult<T extends OptionDefinitionList> {
@@ -44,6 +44,20 @@ export const BUILTIN_COMMANDS: BuiltinCommandDefinitionList = {
     [HELP_COMMAND_NAME]: HELP_COMMAND,
     [VERSION_COMMAND_NAME]: VERSION_COMMAND,
 };
+
+export class ParserError extends Error { }
+
+export class UsageError extends Error { }
+
+export class RegisterError extends Error { }
+
+export const INVALID_COMMAND_ERROR = (command: string, parent?: string): ParserError =>
+    new ParserError(`Invalid command: '${ command }' is not a valid ${ parent
+        ? `sub-command of '${ parent }'`
+        : 'command' }.`);
+
+export const INVALID_OPTION_ERROR = (option: string, command: string): ParserError =>
+    new ParserError(`Invalid option: '${ option }' is not a valid option of command '${ command }'.`);
 
 // TODO: update docs
 /**
@@ -179,31 +193,51 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
         if (!argv) argv = process.argv.slice(2);
 
         // parse the arguments array
-        const { command: matchedCommand } = this.parse(argv);
+        try {
 
-        if (matchedCommand) {
+            const matchedCommand = this.parse(argv).command;
 
-            const command = this._commands[matchedCommand.name];
+            if (matchedCommand) {
 
-            if (command.type === CommandType.SHARED) {
+                // if a command was matched we get its definition
+                const command = this._commands[matchedCommand.name];
 
-                // if a shared command was matched, run its handler with this parser
-                await command.handler(this as unknown as CliParser<OptionDefinitionList>);
+                if (command.type === CommandType.SHARED) {
+
+                    // if a shared command was matched run its handler with this parser
+                    await command.handler(this as never);
+
+                } else {
+
+                    // if a registered command was matched get the command's parser...
+                    const parser = this._parsers[matchedCommand.name];
+
+                    // ...and run it with the updated arguments array
+                    await parser.run(matchedCommand.argv);
+                }
 
             } else {
 
-                // if a registered command was matched, get the command's parser...
-                const parser = this._parsers[matchedCommand.name];
-
-                // ...and run it with the updated arguments array
-                await parser.run(matchedCommand.argv);
+                // otherwise run this parser's command handler
+                await this.definition.handler(this);
             }
 
-        } else {
+        } catch (error) {
 
-            // TODO: handle running help from here when errors in parsing occurred?
-            // otherwise run this parser's command handler
-            await this.definition.handler(this);
+            if (error instanceof ParserError) {
+
+                if (this._commands[HELP_COMMAND_NAME]) {
+
+                    this.state = CliParserState.DONE;
+
+                    console.error(`\n${ error.message }`);
+
+                    await this._commands[HELP_COMMAND_NAME].handler(this as never);
+
+                    return;
+                }
+
+            } else throw error;
         }
     }
 
@@ -240,8 +274,7 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
 
                         if ((parentCommand.commands as CommandDefinitionList<OptionDefinitionList>)?.[command.name] !== command) {
 
-                            // TODO: Improve error message
-                            throw new Error(`Invalid command ${ command.name }: Not a sub command of ${ parentCommand.name }`);
+                            throw INVALID_COMMAND_ERROR(command.name, parentCommand.name);
                         }
                     }
 
@@ -297,22 +330,8 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
 
                     if (!option) {
 
-                        // TODO: only throw error if no help command available - otherwise run help
-
-                        if (this._commands[HELP_COMMAND_NAME]) {
-
-                            // TODO: update parser state, so that config(), options(), ... don't error
-                            // TODO: handle promise...
-                            void this._commands[HELP_COMMAND_NAME].handler(this as unknown as CommandParser<OptionDefinitionList>);
-
-                            // TODO: update result to indicate parsing failed and prevent default handler from being executed
-                            return result;
-
-                        } else {
-
-                            // if the option was not found, it's an invalid option
-                            throw new Error(`Unsupported option '${ curr }': Run '${ this.definition.name } --help' to see the available options.`);
-                        }
+                        // if the option was not found, it's an invalid option
+                        throw INVALID_OPTION_ERROR(curr, this.definition.name);
                     }
 
                     // set the option's value by invoking its type parser using

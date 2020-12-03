@@ -179,6 +179,7 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
         if (!argv) argv = process.argv.slice(2);
 
         // parse the arguments array
+        // TODO: #1 run parse() in try/catch and run help command for input errors
         const { command: matchedCommand } = this.parse(argv);
 
         if (matchedCommand) {
@@ -201,7 +202,6 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
 
         } else {
 
-            // TODO: handle running help from here when errors in parsing occurred?
             // otherwise run this parser's command handler
             await this.definition.handler(this);
         }

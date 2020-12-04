@@ -11,10 +11,19 @@ import {
 } from './command';
 import { HELP_COMMAND } from './commands/help';
 import { VERSION_COMMAND } from './commands/version';
+import {
+    DUPLICATE_COMMAND,
+    DUPLICATE_OPTION,
+    DUPLICATE_PARSER,
+    INVALID_COMMAND,
+    INVALID_OPTION,
+    INVALID_USAGE,
+    ParserError,
+    SilentError,
+} from './errors';
 import { isFlag, LONG_FLAG_PREFIX, SHORT_FLAG_PREFIX } from './flag';
 import { Option, OptionDefinition, OptionDefinitionList } from './option';
 
-// TODO: extract errors
 // TODO: allow inferring shared command names from CommandDefinitionList
 
 export interface CliParserResult<T extends OptionDefinitionList> {
@@ -44,20 +53,6 @@ export const BUILTIN_COMMANDS: BuiltinCommandDefinitionList = {
     [HELP_COMMAND_NAME]: HELP_COMMAND,
     [VERSION_COMMAND_NAME]: VERSION_COMMAND,
 };
-
-export class ParserError extends Error { }
-
-export class UsageError extends Error { }
-
-export class RegisterError extends Error { }
-
-export const INVALID_COMMAND_ERROR = (command: string, parent?: string): ParserError =>
-    new ParserError(`Invalid command: '${ command }' is not a valid ${ parent
-        ? `sub-command of '${ parent }'`
-        : 'command' }.`);
-
-export const INVALID_OPTION_ERROR = (option: string, command: string): ParserError =>
-    new ParserError(`Invalid option: '${ option }' is not a valid option of command '${ command }'.`);
 
 // TODO: update docs
 /**
@@ -108,7 +103,11 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
      */
     arguments (): string[] {
 
-        if (this.state !== CliParserState.DONE) throw new Error('Parser has not run yet. Make sure to call Parser.run() before trying to access parser results.');
+        // we get the name of this method instead of using a string literal 'arguments'
+        // this way we can refactor later on without having to worry about string constants
+        const api = (this.constructor.prototype as CliParser<T>).arguments.name;
+
+        if (this.state !== CliParserState.DONE) throw INVALID_USAGE(this, api);
 
         return this.result.arguments!;
     }
@@ -127,7 +126,11 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
      */
     options (): Partial<CommandConfig<T>> {
 
-        if (this.state !== CliParserState.DONE) throw new Error('Parser has not run yet. Make sure to call Parser.run() before trying to access parser results.');
+        // we get the name of this method instead of using a string literal 'options'
+        // this way we can refactor later on without having to worry about string constants
+        const api = (this.constructor.prototype as CliParser<T>).options.name;
+
+        if (this.state !== CliParserState.DONE) throw INVALID_USAGE(this, api);
 
         return this.result.options!;
     }
@@ -141,7 +144,11 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
      */
     config (): CommandConfig<T> {
 
-        if (this.state !== CliParserState.DONE) throw new Error('Parser has not run yet. Make sure to call Parser.run() before trying to access parser results.');
+        // we get the name of this method instead of using a string literal 'config'
+        // this way we can refactor later on without having to worry about string constants
+        const api = (this.constructor.prototype as CliParser<T>).config.name;
+
+        if (this.state !== CliParserState.DONE) throw INVALID_USAGE(this, api);
 
         return this.result.config!;
     }
@@ -230,11 +237,14 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
 
                     this.state = CliParserState.DONE;
 
-                    console.error(`\n${ error.message }`);
+                    console.error(`${ error.stack! }`);
 
                     await this._commands[HELP_COMMAND_NAME].handler(this as never);
 
-                    return;
+                    // throw a silent error which won't create any output (we already logged
+                    // the error *before* the usage info) but will still cause the process
+                    // to exit with an error code
+                    throw new SilentError();
                 }
 
             } else throw error;
@@ -274,7 +284,7 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
 
                         if ((parentCommand.commands as CommandDefinitionList<OptionDefinitionList>)?.[command.name] !== command) {
 
-                            throw INVALID_COMMAND_ERROR(command.name, parentCommand.name);
+                            throw INVALID_COMMAND(command.name, parentCommand.name);
                         }
                     }
 
@@ -331,7 +341,7 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
                     if (!option) {
 
                         // if the option was not found, it's an invalid option
-                        throw INVALID_OPTION_ERROR(curr, this.definition.name);
+                        throw INVALID_OPTION(curr, this.definition.name);
                     }
 
                     // set the option's value by invoking its type parser using
@@ -386,7 +396,7 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
 
         if (this._options[name]) {
 
-            throw new Error('Option has already been defined');
+            throw DUPLICATE_OPTION(name, this._options[name]);
         }
 
         this._options[name] = option;
@@ -407,9 +417,11 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
 
             longFlags.concat(shortFlags).forEach(flag => {
 
-                if (this._optionLookup.has(flag)) {
+                const duplicate = this._optionLookup.get(flag);
 
-                    throw new Error('Option has already been defined');
+                if (duplicate) {
+
+                    throw DUPLICATE_OPTION(flag, duplicate);
                 }
 
                 this._optionLookup.set(flag, option);
@@ -432,20 +444,22 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
 
         if (this._commands[name]) {
 
-            throw new Error('Command has already been defined');
+            throw DUPLICATE_COMMAND(name, this._commands[name]);
         }
 
-        this._commands[name] = command as unknown as CommandDefinition<OptionDefinitionList>;
+        this._commands[name] = command as never;
 
         // TODO: maybe allow handling commands like flags (with prefixes)
         [name].concat(coerceArray(command.alias)).concat(coerceArray(command.short)).forEach(flag => {
 
-            if (this._commandLookup.has(flag)) {
+            const duplicate = this._commandLookup.get(flag);
 
-                throw new Error(`Command ${ flag } has already been defined.`);
+            if (duplicate) {
+
+                throw DUPLICATE_COMMAND(flag, duplicate);
             }
 
-            this._commandLookup.set(flag, command as unknown as CommandDefinition<OptionDefinitionList>);
+            this._commandLookup.set(flag, command as never);
         });
     }
 
@@ -453,11 +467,13 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
 
         const { name } = parser.definition;
 
+        // this probably won't happen for now, as parsers are always defined after commands
+        // we'd have a `DUPLICATE_COMMAND` error before
         if (this._parsers[name]) {
 
-            throw new Error(`CommandParser ${ name } has already been defined.`);
+            throw DUPLICATE_PARSER(name, this._parsers[name]);
         }
 
-        this._parsers[name] = parser as unknown as CliParser<OptionDefinitionList>;
+        this._parsers[name] = parser as never;
     }
 }

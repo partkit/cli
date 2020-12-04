@@ -32,4 +32,29 @@ const cli = new CliParser({
     .nest(ECHO_COMMAND);
 
 // we run the CliParser instance
-void (async () => await cli.run())();
+void (async () => {
+
+    await cli.run();
+})();
+
+class UnhandledPromiseRejectionWarning extends Error {
+    name = this.constructor.name;
+}
+
+process.addListener('unhandledRejection', reason => {
+
+    // TODO: this could be abstracted into an error utility method
+    const error = (reason instanceof Error)
+        ? reason
+        : new UnhandledPromiseRejectionWarning(String(reason));
+
+    const output = error.stack
+        ? error.stack
+        : error.message
+            ? [error.name || 'Error', error.message].join(': ')
+            : error.name || '';
+
+    if (output) console.error(output);
+
+    process.exitCode = 1;
+});

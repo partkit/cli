@@ -8,10 +8,12 @@ import {
     CommandDefinitionList,
     CommandParser,
     CommandType,
+    HELP_COMMAND_NAME,
     IsolatedCommandDefinition,
+    VERSION_COMMAND_NAME,
 } from './command';
-import { HELP_COMMAND, HELP_COMMAND_NAME } from './commands/help';
-import { VERSION_COMMAND, VERSION_COMMAND_NAME } from './commands/version';
+import { HELP_COMMAND } from './commands/help';
+import { VERSION_COMMAND } from './commands/version';
 import {
     CONFLICTING_COMMAND,
     CONFLICTING_OPTION,
@@ -26,8 +28,6 @@ import {
 } from './errors';
 import { isFlag, isNegatedFlag, LONG_FLAG_PREFIX, LONG_FLAG_REGEXP, NEGATED_FLAG_PREFIX, SHORT_FLAG_PREFIX } from './flag';
 import { Option, OptionDefinition, OptionDefinitionList } from './option';
-
-// TODO: allow inferring shared command names from CommandDefinitionList
 
 interface CliParserCommandMatch {
     name: string;
@@ -233,19 +233,31 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
 
             if (error instanceof ParserError) {
 
-                if (this._commands[HELP_COMMAND_NAME]) {
+                // encountering a parser error means that the cli input was invalid
+                // we should display the command's help, if it is defined
+                const help = this._commands[HELP_COMMAND_NAME];
 
-                    this.state = CliParserState.DONE;
+                // if there is no help command for this command, throw the ParserError
+                // the error will bubble up to the parent parser (for nested commands)
+                // and eventually invoke a parent command's help, if defined
+                if (!help) {
 
-                    console.error(`${ error.stack! }`);
-
-                    await this._commands[HELP_COMMAND_NAME].handler(this as never);
-
-                    // throw a silent error which won't create any output (we already logged
-                    // the error *before* the usage info) but will still cause the process
-                    // to exit with an error code
-                    throw new SilentError();
+                    throw error;
                 }
+
+                // if there is a help command for this command, we update the parser state, ...
+                this.state = CliParserState.DONE;
+
+                // ...log the parser error *before* the help output ...
+                console.error(`${ error.stack! }`);
+
+                // ...and run the help command
+                await help.handler(this as never);
+
+                // throw a silent error which won't create any output (we already logged
+                // the error *before* the usage info) but will still cause the process
+                // to exit with an error code
+                throw new SilentError();
 
             } else throw error;
         }

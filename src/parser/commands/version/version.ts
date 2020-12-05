@@ -1,7 +1,5 @@
 import { findPackageJson } from '../../../package-json';
-import { command, CommandType } from '../../command';
-
-export const VERSION_COMMAND_NAME = 'version';
+import { command, CommandType, VERSION_COMMAND_NAME } from '../../command';
 
 export const VERSION_COMMAND = command({
     type: CommandType.SHARED,

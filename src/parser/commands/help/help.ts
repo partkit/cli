@@ -1,5 +1,5 @@
 import { coerceArray } from '../../../utils';
-import { command, CommandHandler, CommandType } from '../../command';
+import { command, CommandHandler, CommandType, HELP_COMMAND_NAME } from '../../command';
 import { LONG_FLAG_PREFIX, SHORT_FLAG_PREFIX } from '../../flag';
 import { Option, OptionDefinitionList } from '../../option';
 
@@ -37,8 +37,6 @@ export const HELP: CommandHandler<OptionDefinitionList> = (parser) => {
     console.log(`\n${ usage }`);
     console.log(`\n${ options }\n`);
 };
-
-export const HELP_COMMAND_NAME = 'help';
 
 export const HELP_COMMAND = command({
     type: CommandType.SHARED,

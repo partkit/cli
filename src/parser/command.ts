@@ -1,5 +1,3 @@
-import { HELP_COMMAND_NAME } from './commands/help';
-import { VERSION_COMMAND_NAME } from './commands/version';
 import { OptionDefinition, OptionDefinitionList } from './option';
 
 /**
@@ -75,6 +73,10 @@ export type Command<T extends OptionDefinitionList> = IsolatedCommandDefinition<
 export interface CommandDefinitionList<T extends OptionDefinitionList> {
     [key: string]: SharedCommandDefinition<T>;
 }
+
+export const HELP_COMMAND_NAME = 'help';
+
+export const VERSION_COMMAND_NAME = 'version';
 
 /**
  * A BuiltinCommandDefinitionList is a CommandDefinitionList with two optional

@@ -38,10 +38,12 @@ export const HELP: CommandHandler<OptionDefinitionList> = (parser) => {
     console.log(`\n${ options }\n`);
 };
 
+export const HELP_COMMAND_NAME = 'help';
+
 export const HELP_COMMAND = command({
     type: CommandType.SHARED,
     handler: HELP,
-    name: 'help',
+    name: HELP_COMMAND_NAME,
     short: 'h',
     asFlag: true,
     description: 'Displays this help screen.',

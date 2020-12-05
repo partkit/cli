@@ -9,8 +9,8 @@ import {
     CommandType,
     IsolatedCommandDefinition,
 } from './command';
-import { HELP_COMMAND } from './commands/help';
-import { VERSION_COMMAND } from './commands/version';
+import { HELP_COMMAND, HELP_COMMAND_NAME } from './commands/help';
+import { VERSION_COMMAND, VERSION_COMMAND_NAME } from './commands/version';
 import {
     CONFLICTING_COMMAND,
     CONFLICTING_OPTION,
@@ -47,11 +47,6 @@ export const enum CliParserState {
     OPTION = 'OPTION',
     DONE = 'DONE',
 }
-
-// TODO: use these in code!
-export const HELP_COMMAND_NAME = 'help';
-
-export const VERSION_COMMAND_NAME = 'version';
 
 export const BUILTIN_COMMANDS: BuiltinCommandDefinitionList = {
     [HELP_COMMAND_NAME]: HELP_COMMAND,
@@ -427,7 +422,6 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
         if (!option.hidden) {
 
             let longFlags = coerceArray(option.alias);
-
             let shortFlags = coerceArray(option.short);
 
             if (!option.hiddenName) {
@@ -489,7 +483,6 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
         this._commands[name] = command as never;
 
         let longFlags = coerceArray(command.alias).concat(name);
-
         let shortFlags = coerceArray(command.short);
 
         if (command.asFlag) {

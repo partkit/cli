@@ -23,7 +23,6 @@ const cli = new CliParser({
                 // options contains all the options which were specified via cli
                 console.log(parser.options());
             },
-            name: 'sub',
             description: 'A shared sub command.',
         },
     },

@@ -1,3 +1,5 @@
+import { HELP_COMMAND_NAME } from './commands/help';
+import { VERSION_COMMAND_NAME } from './commands/version';
 import { OptionDefinition, OptionDefinitionList } from './option';
 
 /**
@@ -26,7 +28,7 @@ export interface CommandHandler<T extends OptionDefinitionList> {
 interface BaseCommandDefinition<T extends OptionDefinitionList> {
     type: CommandType;
     handler: CommandHandler<T>;
-    name: string;
+    name?: string;
     alias?: string | string[];
     short?: string | string[];
     description?: string;
@@ -48,6 +50,7 @@ export interface SharedCommandDefinition<T extends OptionDefinitionList> extends
  */
 export interface IsolatedCommandDefinition<T extends OptionDefinitionList> extends BaseCommandDefinition<T> {
     type: CommandType.ISOLATED;
+    name: string;
     options?: T;
     commands?: CommandDefinitionList<T> | BuiltinCommandDefinitionList;
 }
@@ -56,6 +59,14 @@ export interface IsolatedCommandDefinition<T extends OptionDefinitionList> exten
  * A CommandDefinition describes a command for the CommandParser.
  */
 export type CommandDefinition<T extends OptionDefinitionList> = IsolatedCommandDefinition<T> | SharedCommandDefinition<T>;
+
+/**
+ * A Command is a runtime description of a command for the CommandParser.
+ *
+ * @remarks
+ * A Command will always have a name.
+ */
+export type Command<T extends OptionDefinitionList> = IsolatedCommandDefinition<T> | (SharedCommandDefinition<T> & { name: string; });
 
 /**
  * A CommandDefinitionList is a record of SharedCommandDefinitions with the
@@ -75,8 +86,8 @@ export interface CommandDefinitionList<T extends OptionDefinitionList> {
  * setting the appropriate key to `null`.
  */
 export interface BuiltinCommandDefinitionList {
-    help?: SharedCommandDefinition<OptionDefinitionList> | null;
-    version?: SharedCommandDefinition<OptionDefinitionList> | null;
+    [HELP_COMMAND_NAME]?: SharedCommandDefinition<OptionDefinitionList> | null;
+    [VERSION_COMMAND_NAME]?: SharedCommandDefinition<OptionDefinitionList> | null;
 }
 
 /**

@@ -43,8 +43,7 @@ export const HELP_COMMAND_NAME = 'help';
 export const HELP_COMMAND = command({
     type: CommandType.SHARED,
     handler: HELP,
-    name: HELP_COMMAND_NAME,
-    short: 'h',
+    short: HELP_COMMAND_NAME.charAt(0),
     asFlag: true,
     description: 'Displays this help screen.',
 });

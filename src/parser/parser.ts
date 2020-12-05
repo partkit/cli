@@ -2,6 +2,7 @@
 import { coerceArray } from '../utils';
 import {
     BuiltinCommandDefinitionList,
+    Command,
     CommandConfig,
     CommandDefinition,
     CommandDefinitionList,
@@ -64,13 +65,13 @@ export const BUILTIN_COMMANDS: BuiltinCommandDefinitionList = {
  */
 export class CliParser<T extends OptionDefinitionList> implements CommandParser<T> {
 
-    protected _commands: Record<string, CommandDefinition<OptionDefinitionList>> = {};
+    protected _commands: Record<string, Command<OptionDefinitionList>> = {};
 
     protected _parsers: Record<string, CliParser<OptionDefinitionList>> = {};
 
     protected _options: Record<string, Option> = {};
 
-    protected _commandLookup = new Map<string, CommandDefinition<OptionDefinitionList>>();
+    protected _commandLookup = new Map<string, Command<OptionDefinitionList>>();
 
     protected _optionLookup = new Map<string, Option<unknown>>();
 
@@ -176,7 +177,7 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
             ? commandOrParser
             : new CliParser(commandOrParser);
 
-        this.registerCommand(command);
+        this.registerCommand(command.name, command);
         this.registerParser(parser);
 
         return this;
@@ -403,7 +404,7 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
 
     protected registerOptions (options: T): void {
 
-        Object.entries(options).forEach(([key, option]) => this.registerOption(key, option));
+        Object.entries(options).forEach(([name, option]) => this.registerOption(name, option));
     }
 
     protected registerOption<U extends unknown> (name: string, definition: OptionDefinition<U>): void {
@@ -464,16 +465,16 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
 
     protected registerCommands (commands: CommandDefinitionList<T> | BuiltinCommandDefinitionList): void {
 
-        Object.values(commands).forEach(command => {
+        Object.entries(commands).forEach(([name, command]) => {
 
             // BuiltinCommandDefinitionList allows `null` values for the `help` and `version` command
-            if (command) { this.registerCommand(command); }
+            if (command) { this.registerCommand(name, command); }
         });
     }
 
-    protected registerCommand<U extends OptionDefinitionList> (command: CommandDefinition<U>): void {
+    protected registerCommand<U extends OptionDefinitionList> (name: string, definition: CommandDefinition<U>): void {
 
-        const { name } = command;
+        const command: Command<U> = { ...definition, name };
 
         if (this._commands[name]) {
 

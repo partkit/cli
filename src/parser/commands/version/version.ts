@@ -12,8 +12,7 @@ export const VERSION_COMMAND = command({
 
         console.log(`${ name } ${ version }`);
     },
-    name: VERSION_COMMAND_NAME,
-    short: 'v',
+    short: VERSION_COMMAND_NAME.charAt(0),
     asFlag: true,
     description: 'Displays the version of this cli.',
 });

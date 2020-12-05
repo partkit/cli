@@ -16,21 +16,21 @@ export const NEGATED_FLAG_PREFIX = '--no-';
 /**
  * A RegExp to test if a string is a long flag
  */
-export const LONG_FLAG_REGEXP = /^--(\w[^\s]*)/;
+export const LONG_FLAG_REGEXP = /^--(\D[^\s]*)/;
 
 /**
  * A RegExp to test if a string is a short flag
  *
  * @remarks
- * This RegExp checks for a word-character after the flag to differentiate
+ * This RegExp checks for a non-digit-character after the flag to differentiate
  * between a short flag, e.g. '-h', and a negative number, e.g. '-1'.
  */
-export const SHORT_FLAG_REGEXP = /^-(\w)/;
+export const SHORT_FLAG_REGEXP = /^-(\D)/;
 
 /**
  * A RegExp to test if a string is a negated flag
  */
-export const NEGATED_FLAG_REGEXP = /^--no-(\w[^\s]*)/;
+export const NEGATED_FLAG_REGEXP = /^--no-(\D[^\s]*)/;
 
 /**
  * Tests if a string is a flag

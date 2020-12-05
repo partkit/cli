@@ -9,9 +9,14 @@ export const LONG_FLAG_PREFIX = '--';
 export const SHORT_FLAG_PREFIX = '-';
 
 /**
+ * The prefix used for negated flags
+ */
+export const NEGATED_FLAG_PREFIX = '--no-';
+
+/**
  * A RegExp to test if a string is a long flag
  */
-export const LONG_FLAG_REGEXP = /^--\w/;
+export const LONG_FLAG_REGEXP = /^--(\w[^\s]*)/;
 
 /**
  * A RegExp to test if a string is a short flag
@@ -20,7 +25,12 @@ export const LONG_FLAG_REGEXP = /^--\w/;
  * This RegExp checks for a word-character after the flag to differentiate
  * between a short flag, e.g. '-h', and a negative number, e.g. '-1'.
  */
-export const SHORT_FLAG_REGEXP = /^-\w/;
+export const SHORT_FLAG_REGEXP = /^-(\w)/;
+
+/**
+ * A RegExp to test if a string is a negated flag
+ */
+export const NEGATED_FLAG_REGEXP = /^--no-(\w[^\s]*)/;
 
 /**
  * Tests if a string is a flag
@@ -50,4 +60,14 @@ export function isLongFlag (value: string): boolean {
 export function isShortFlag (value: string): boolean {
 
     return SHORT_FLAG_REGEXP.test(value);
+}
+
+/**
+ * Tests if a string is a negated flag
+ *
+ * @param value - The string to test
+ */
+export function isNegatedFlag (value: string): boolean {
+
+    return NEGATED_FLAG_REGEXP.test(value);
 }

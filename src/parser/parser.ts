@@ -21,16 +21,18 @@ import {
     ParserError,
     SilentError,
 } from './errors';
-import { isFlag, LONG_FLAG_PREFIX, SHORT_FLAG_PREFIX } from './flag';
+import { isFlag, isNegatedFlag, LONG_FLAG_PREFIX, LONG_FLAG_REGEXP, NEGATED_FLAG_PREFIX, SHORT_FLAG_PREFIX } from './flag';
 import { Option, OptionDefinition, OptionDefinitionList } from './option';
 
 // TODO: allow inferring shared command names from CommandDefinitionList
 
+interface CliParserCommandMatch {
+    name: string;
+    argv: string[];
+}
+
 export interface CliParserResult<T extends OptionDefinitionList> {
-    command?: {
-        name: string;
-        argv: string[];
-    };
+    command?: CliParserCommandMatch;
     arguments?: string[];
     options?: Partial<CommandConfig<T>>;
     config?: CommandConfig<T>;
@@ -253,12 +255,10 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
 
     protected parse (argv: string[] = []): CliParserResult<T> {
 
+        const last = argv.length - 1;
         const args: string[] = [];
         const options: Partial<CommandConfig<T>> = {};
-        const config: CommandConfig<T> = {} as CommandConfig<T>;
-        const result: CliParserResult<T> = {};
-
-        const last = argv.length - 1;
+        let commandMatch: CliParserCommandMatch | undefined;
 
         // start parsing for commands first
         this.state = CliParserState.COMMAND;
@@ -280,7 +280,7 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
                     // shared command has to be a child of the previous shared command
                     if (this.state === CliParserState.SHARED) {
 
-                        const parentCommand = this._commands[result.command!.name];
+                        const parentCommand = this._commands[commandMatch!.name];
 
                         if ((parentCommand.commands as CommandDefinitionList<OptionDefinitionList>)?.[command.name] !== command) {
 
@@ -290,7 +290,7 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
 
                     // update the parser result with the matched command name
                     // and an updated arguments array (removing the command name)
-                    result.command = {
+                    commandMatch = {
                         name: command.name,
                         argv: argv.slice(i + 1),
                     };
@@ -332,8 +332,6 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
 
                 } else {
 
-                    // TODO: allow --no-<option> prefix for flags
-
                     // if the `curr` argument is an option (a flag) retrieve it
                     // from the options lookup map
                     const option = this._optionLookup.get(curr);
@@ -344,10 +342,18 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
                         throw INVALID_OPTION(curr, this.definition.name);
                     }
 
+                    // for negated flags (--no-<option>) we set the value to `undefined`
+                    // a TypeParser should handle `undefined` values appropriately
+                    const value = isNegatedFlag(curr)
+                        ? undefined
+                        : !nextFlag
+                            ? next ?? ''
+                            : '';
+
                     // set the option's value by invoking its type parser using
                     // the `next` argument if it is not a flag itself, otherwise
                     // use an empty string
-                    option.value = option.parse(!nextFlag ? next ?? '' : '');
+                    option.value = option.parse(value);
 
                     // store the option in the result's options object
                     options[option.name as keyof T] = option.value as never;
@@ -359,28 +365,43 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
             }
         }
 
-        // after parsing the arguments array create a config object containing all
-        // options - either specified on the command line or not - and provide the
-        // parsed values or default values
-        Object.entries(this._options).reduce((config, [name, option]) => {
-
-            config[name as keyof T] = (option.value ?? option.default) as never;
-
-            return config;
-
-        }, config);
-
-        // store the parser results in the result object
-        result.arguments = args;
-        result.options = options;
-        result.config = config;
-
-        this.result = result;
+        // after parsing the arguments array create a parser result
+        this.result = this.createParserResult(args, options, commandMatch);
 
         // the parser is now done
         this.state = CliParserState.DONE;
 
-        return result;
+        return this.result;
+    }
+
+    protected createParserResult (
+        args: string[],
+        options: Partial<CommandConfig<T>>,
+        command?: CliParserCommandMatch,
+    ): CliParserResult<T> {
+
+        return {
+            command,
+            arguments: args ?? [],
+            options: options ?? [],
+            config: {
+                // merge the default option values...
+                ...this.createDefaultConfig(),
+                // ...and the cli provided option values
+                ...options,
+            },
+        };
+    }
+
+    protected createDefaultConfig (): CommandConfig<T> {
+
+        return Object.entries(this._options).reduce((config, [name, option]) => {
+
+            config[name as keyof T] = option.default as never;
+
+            return config;
+
+        }, {} as CommandConfig<T>);
     }
 
     protected registerOptions (options: T): void {
@@ -414,6 +435,15 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
 
             longFlags = longFlags.map(flag => `${ LONG_FLAG_PREFIX }${ flag }`);
             shortFlags = shortFlags.map(flag => `${ SHORT_FLAG_PREFIX }${ flag }`);
+
+            // if option negation is allowed, we automatically create a --no-<option> flag
+            // for each long flag (that is, aliases and name)
+            if (!option.noNegation) {
+
+                longFlags = longFlags.concat(
+                    longFlags.map(flag => flag.replace(LONG_FLAG_REGEXP, `${ NEGATED_FLAG_PREFIX }$1`)),
+                );
+            }
 
             longFlags.concat(shortFlags).forEach(flag => {
 

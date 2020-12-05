@@ -9,6 +9,7 @@ export interface OptionDefinition<T = unknown> {
     required?: boolean;
     hidden?: boolean;
     hiddenName?: boolean;
+    noNegation?: boolean,
 }
 
 export interface OptionDefinitionList {

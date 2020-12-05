@@ -44,3 +44,9 @@ export const DUPLICATE_COMMAND = <T extends OptionDefinitionList> (command: stri
 
 export const DUPLICATE_PARSER = <T extends OptionDefinitionList> (command: string, conflict: CommandParser<T>): RegisterError =>
     new RegisterError(`Duplicate parser definition. The command name '${ command }' has already been used by another parser:\n${ inspect(conflict.definition) }`);
+
+export const CONFLICTING_OPTION = <T extends OptionDefinitionList> (flag: string, conflict: CommandDefinition<T>): RegisterError =>
+    new RegisterError(`Conflicting option definition. The option flag '${ flag }' has already been used by another command:\n${ inspect(conflict) }`);
+
+export const CONFLICTING_COMMAND = (flag: string, conflict: OptionDefinition): RegisterError =>
+    new RegisterError(`Conflicting command definition. The command flag '${ flag }' has already been used by another option:\n${ inspect(conflict) }`);

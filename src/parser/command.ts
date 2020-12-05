@@ -30,6 +30,7 @@ interface BaseCommandDefinition<T extends OptionDefinitionList> {
     alias?: string | string[];
     short?: string | string[];
     description?: string;
+    asFlag?: boolean;
 }
 
 /**

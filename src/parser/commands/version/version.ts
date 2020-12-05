@@ -12,5 +12,6 @@ export const VERSION_COMMAND = command({
     },
     name: 'version',
     short: 'v',
+    asFlag: true,
     description: 'Displays the version of this cli.',
 });

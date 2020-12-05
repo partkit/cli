@@ -12,6 +12,8 @@ import {
 import { HELP_COMMAND } from './commands/help';
 import { VERSION_COMMAND } from './commands/version';
 import {
+    CONFLICTING_COMMAND,
+    CONFLICTING_OPTION,
     DUPLICATE_COMMAND,
     DUPLICATE_OPTION,
     DUPLICATE_PARSER,
@@ -454,6 +456,13 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
                     throw DUPLICATE_OPTION(flag, duplicate);
                 }
 
+                const conflict = this._commandLookup.get(flag);
+
+                if (conflict) {
+
+                    throw CONFLICTING_OPTION(flag, conflict);
+                }
+
                 this._optionLookup.set(flag, option);
             });
         }
@@ -479,14 +488,30 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
 
         this._commands[name] = command as never;
 
-        // TODO: maybe allow handling commands like flags (with prefixes)
-        [name].concat(coerceArray(command.alias)).concat(coerceArray(command.short)).forEach(flag => {
+        let longFlags = coerceArray(command.alias).concat(name);
+
+        let shortFlags = coerceArray(command.short);
+
+        if (command.asFlag) {
+
+            longFlags = longFlags.map(flag => `${ LONG_FLAG_PREFIX }${ flag }`);
+            shortFlags = shortFlags.map(flag => `${ SHORT_FLAG_PREFIX }${ flag }`);
+        }
+
+        longFlags.concat(shortFlags).forEach(flag => {
 
             const duplicate = this._commandLookup.get(flag);
 
             if (duplicate) {
 
                 throw DUPLICATE_COMMAND(flag, duplicate);
+            }
+
+            const conflict = this._optionLookup.get(flag);
+
+            if (conflict) {
+
+                throw CONFLICTING_COMMAND(flag, conflict);
             }
 
             this._commandLookup.set(flag, command as never);

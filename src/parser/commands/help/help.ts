@@ -43,5 +43,6 @@ export const HELP_COMMAND = command({
     handler: HELP,
     name: 'help',
     short: 'h',
+    asFlag: true,
     description: 'Displays this help screen.',
 });

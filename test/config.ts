@@ -1,4 +1,4 @@
-import { BOOLEAN, CommandConfig, NUMBER, options, STRING } from '../src';
+import { ARRAY, BOOLEAN, CommandConfig, NUMBER, options, STRING } from '../src';
 
 export const CLI_OPTIONS = options({
     foo: {
@@ -7,11 +7,21 @@ export const CLI_OPTIONS = options({
         short: 'f',
         description: 'A random string that you can provide.',
     },
+    foos: {
+        parse: ARRAY(STRING),
+        default: [],
+        description: 'A list of strings.',
+    },
     port: {
         parse: NUMBER,
         default: 3000,
         short: 'p',
         description: 'A port number.',
+    },
+    ports: {
+        parse: ARRAY(NUMBER),
+        default: [],
+        description: 'A list of ports.',
     },
     verbose: {
         parse: BOOLEAN,

@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-non-null-assertion */
 import { coerceArray } from '../utils';
+import { Argument, ArgumentConfig, ArgumentDefinition, ArgumentDefinitionList } from './argument';
 import {
     BuiltinCommandDefinitionList,
     Command,
-    CommandConfig,
     CommandDefinition,
     CommandDefinitionList,
     CommandParser,
@@ -27,18 +27,18 @@ import {
     SilentError,
 } from './errors';
 import { isFlag, isNegatedFlag, LONG_FLAG_PREFIX, LONG_FLAG_REGEXP, NEGATED_FLAG_PREFIX, SHORT_FLAG_PREFIX } from './flag';
-import { Option, OptionDefinition, OptionDefinitionList } from './option';
+import { Option, OptionConfig, OptionDefinition, OptionDefinitionList } from './option';
 
 interface CliParserCommandMatch {
     name: string;
     argv: string[];
 }
 
-export interface CliParserResult<T extends OptionDefinitionList> {
+export interface CliParserResult<O extends OptionDefinitionList, A extends ArgumentDefinitionList> {
     command?: CliParserCommandMatch;
-    arguments?: string[];
-    options?: Partial<CommandConfig<T>>;
-    config?: CommandConfig<T>;
+    arguments?: Partial<ArgumentConfig<A>>;
+    options?: Partial<OptionConfig<O>>;
+    config?: OptionConfig<O>;
 }
 
 export const enum CliParserState {
@@ -63,25 +63,32 @@ export const BUILTIN_COMMANDS: BuiltinCommandDefinitionList = {
  * the command and parse its respective command line arguments, a CommandParser
  * has to be instantiated with the CommandDefinition as argument.
  */
-export class CliParser<T extends OptionDefinitionList> implements CommandParser<T> {
+export class CliParser<O extends OptionDefinitionList, A extends ArgumentDefinitionList> implements CommandParser<O, A> {
 
-    protected _commands: Record<string, Command<OptionDefinitionList>> = {};
+    protected _commands: Record<string, Command<OptionDefinitionList, ArgumentDefinitionList>> = {};
 
-    protected _parsers: Record<string, CliParser<OptionDefinitionList>> = {};
+    protected _parsers: Record<string, CliParser<OptionDefinitionList, ArgumentDefinitionList>> = {};
+
+    protected _arguments: Argument[] = [];
 
     protected _options: Record<string, Option> = {};
 
-    protected _commandLookup = new Map<string, Command<OptionDefinitionList>>();
+    protected _commandLookup = new Map<string, Command<OptionDefinitionList, ArgumentDefinitionList>>();
 
     protected _optionLookup = new Map<string, Option<unknown>>();
 
     protected state: CliParserState = CliParserState.INITIAL;
 
-    protected result: CliParserResult<T> = {};
+    protected result: CliParserResult<O, A> = {};
 
-    constructor (public definition: IsolatedCommandDefinition<T>) {
+    constructor (public definition: IsolatedCommandDefinition<O, A>) {
 
-        const { options, commands } = this.definition;
+        const { arguments: args, options, commands } = this.definition;
+
+        if (args) {
+
+            this.registerArguments(args);
+        }
 
         if (options) {
 
@@ -101,11 +108,11 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
      * Parsed arguments are only available once the command parser was run. Invoking
      * this method before calling {@link CommandParser.run} will result in an error.
      */
-    arguments (): string[] {
+    arguments (): Partial<ArgumentConfig<A>> {
 
         // we get the name of this method instead of using a string literal 'arguments'
         // this way we can refactor later on without having to worry about string constants
-        const api = (this.constructor.prototype as CliParser<T>).arguments.name;
+        const api = (this.constructor.prototype as CliParser<O, A>).arguments.name;
 
         if (this.state !== CliParserState.DONE) throw INVALID_USAGE(this, api);
 
@@ -124,11 +131,11 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
      * via the command line. To get all options (with default values for options
      * not specified via the command line) use {@link CommandParser.config}.
      */
-    options (): Partial<CommandConfig<T>> {
+    options (): Partial<OptionConfig<O>> {
 
         // we get the name of this method instead of using a string literal 'options'
         // this way we can refactor later on without having to worry about string constants
-        const api = (this.constructor.prototype as CliParser<T>).options.name;
+        const api = (this.constructor.prototype as CliParser<O, A>).options.name;
 
         if (this.state !== CliParserState.DONE) throw INVALID_USAGE(this, api);
 
@@ -142,11 +149,11 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
      * Parsed config is only available once the command parser was run. Invoking
      * this method before calling {@link CommandParser.run} will result in an error.
      */
-    config (): CommandConfig<T> {
+    config (): OptionConfig<O> {
 
         // we get the name of this method instead of using a string literal 'config'
         // this way we can refactor later on without having to worry about string constants
-        const api = (this.constructor.prototype as CliParser<T>).config.name;
+        const api = (this.constructor.prototype as CliParser<O, A>).config.name;
 
         if (this.state !== CliParserState.DONE) throw INVALID_USAGE(this, api);
 
@@ -165,9 +172,9 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
      *
      * @param commandOrParser - The command or parser to register
      */
-    nest<U extends OptionDefinitionList> (command: IsolatedCommandDefinition<U>): CliParser<T>;
-    nest<U extends OptionDefinitionList> (parser: CliParser<U>): CliParser<T>;
-    nest<U extends OptionDefinitionList> (commandOrParser: IsolatedCommandDefinition<U> | CliParser<U>): CliParser<T> {
+    nest<U extends OptionDefinitionList, V extends ArgumentDefinitionList> (command: IsolatedCommandDefinition<U, V>): CliParser<O, A>;
+    nest<U extends OptionDefinitionList, V extends ArgumentDefinitionList> (parser: CliParser<U, V>): CliParser<O, A>;
+    nest<U extends OptionDefinitionList, V extends ArgumentDefinitionList> (commandOrParser: IsolatedCommandDefinition<U, V> | CliParser<U, V>): CliParser<O, A> {
 
         const command = (commandOrParser instanceof CliParser)
             ? commandOrParser.definition
@@ -263,11 +270,11 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
         }
     }
 
-    protected parse (argv: string[] = []): CliParserResult<T> {
+    protected parse (argv: string[] = []): CliParserResult<O, A> {
 
         const last = argv.length - 1;
-        const args: string[] = [];
-        const options: Partial<CommandConfig<T>> = {};
+        const args: Partial<ArgumentConfig<A>> = [] as never;
+        const options: Partial<OptionConfig<O>> = {};
         let commandMatch: CliParserCommandMatch | undefined;
 
         // start parsing for commands first
@@ -292,7 +299,7 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
 
                         const parentCommand = this._commands[commandMatch!.name];
 
-                        if ((parentCommand.commands as CommandDefinitionList<OptionDefinitionList>)?.[command.name] !== command) {
+                        if ((parentCommand.commands as CommandDefinitionList<O, A>)?.[command.name] !== command) {
 
                             throw INVALID_COMMAND(command.name, parentCommand.name);
                         }
@@ -338,7 +345,11 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
 
                     // if the `curr` argument is not an option, push it in the
                     // result's arguments array
-                    args.push(curr);
+                    const argument = this._arguments[args.length];
+
+                    // TODO: should we error if there's no argument definition?
+                    // TODO: handle argument default values
+                    args.push(argument ? argument.parse(curr) : curr);
 
                 } else {
 
@@ -366,7 +377,7 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
                     option.value = option.parse(value);
 
                     // store the option in the result's options object
-                    options[option.name as keyof T] = option.value as never;
+                    options[option.name as keyof O] = option.value as never;
 
                     // if the `next` argument was used as option value we can skip
                     // it in the next parsing iteration by incrementing `i` by `1`
@@ -385,15 +396,15 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
     }
 
     protected createParserResult (
-        args: string[],
-        options: Partial<CommandConfig<T>>,
+        args: Partial<ArgumentConfig<A>>,
+        options: Partial<OptionConfig<O>>,
         command?: CliParserCommandMatch,
-    ): CliParserResult<T> {
+    ): CliParserResult<O, A> {
 
         return {
             command,
-            arguments: args ?? [],
-            options: options ?? [],
+            arguments: args,
+            options,
             config: {
                 // merge the default option values...
                 ...this.createDefaultConfig(),
@@ -403,18 +414,28 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
         };
     }
 
-    protected createDefaultConfig (): CommandConfig<T> {
+    protected createDefaultConfig (): OptionConfig<O> {
 
         return Object.entries(this._options).reduce((config, [name, option]) => {
 
-            config[name as keyof T] = option.default as never;
+            config[name as keyof O] = option.default as never;
 
             return config;
 
-        }, {} as CommandConfig<T>);
+        }, {} as OptionConfig<O>);
     }
 
-    protected registerOptions (options: T): void {
+    protected registerArguments (args: A): void {
+
+        args.forEach((arg, index) => this.registerArgument(index, arg));
+    }
+
+    protected registerArgument<T extends unknown> (index: number, definition: ArgumentDefinition<T>): void {
+
+        this._arguments[index] = { ...definition };
+    }
+
+    protected registerOptions (options: O): void {
 
         Object.entries(options).forEach(([name, option]) => this.registerOption(name, option));
     }
@@ -475,7 +496,7 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
         }
     }
 
-    protected registerCommands (commands: CommandDefinitionList<T> | BuiltinCommandDefinitionList): void {
+    protected registerCommands (commands: CommandDefinitionList<O, A> | BuiltinCommandDefinitionList): void {
 
         Object.entries(commands).forEach(([name, command]) => {
 
@@ -484,9 +505,9 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
         });
     }
 
-    protected registerCommand<U extends OptionDefinitionList> (name: string, definition: CommandDefinition<U>): void {
+    protected registerCommand<U extends OptionDefinitionList, V extends ArgumentDefinitionList> (name: string, definition: CommandDefinition<U, V>): void {
 
-        const command: Command<U> = { ...definition, name };
+        const command: Command<U, V> = { ...definition, name };
 
         if (this._commands[name]) {
 
@@ -524,7 +545,7 @@ export class CliParser<T extends OptionDefinitionList> implements CommandParser<
         });
     }
 
-    protected registerParser<U extends OptionDefinitionList> (parser: CliParser<U>): void {
+    protected registerParser<U extends OptionDefinitionList, V extends ArgumentDefinitionList> (parser: CliParser<U, V>): void {
 
         const { name } = parser.definition;
 

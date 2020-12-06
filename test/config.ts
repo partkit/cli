@@ -1,6 +1,6 @@
-import { ARRAY, BOOLEAN, CommandConfig, NUMBER, options, STRING } from '../src';
+import { ARRAY, BOOLEAN, OptionConfig, NUMBER, opts, STRING } from '../src';
 
-export const CLI_OPTIONS = options({
+export const CLI_OPTIONS = opts({
     foo: {
         parse: STRING,
         default: 'foobar',
@@ -34,4 +34,4 @@ export const CLI_OPTIONS = options({
 export type CliOptions = typeof CLI_OPTIONS;
 
 // a helper type so we don't have to write `CommandConfig<CliOptions>`
-export type CliConfig = CommandConfig<CliOptions>;
+export type CliConfig = OptionConfig<CliOptions>;

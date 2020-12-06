@@ -1,7 +1,7 @@
-import { BOOLEAN, options } from '../../../src';
+import { args, ARRAY, BOOLEAN, NUMBER, opts, STRING } from '../../../src';
 import { CLI_OPTIONS } from '../../config';
 
-export const ECHO_OPTIONS = options({
+export const ECHO_OPTIONS = opts({
     // we can inherit options from any other command - like here from the parent cli command
     ...CLI_OPTIONS,
     // and add or override custom options
@@ -21,3 +21,17 @@ export const ECHO_OPTIONS = options({
 
 // a helper type so we don't have to write `typeof ECHO_OPTIONS`
 export type EchoOptions = typeof ECHO_OPTIONS;
+
+export const ECHO_ARGUMENTS = args(
+    {
+        parse: ARRAY(STRING),
+        name: 'words',
+    },
+    {
+        parse: NUMBER,
+        name: 'which',
+    },
+);
+
+// a helper type so we don't have to write `typeof ECHO_ARGUMENTS`
+export type EchoArguments = typeof ECHO_ARGUMENTS;

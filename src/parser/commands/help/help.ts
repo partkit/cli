@@ -1,4 +1,5 @@
 import { coerceArray } from '../../../utils';
+import { ArgumentDefinitionList } from '../../argument';
 import { command, CommandHandler, CommandType, HELP_COMMAND_NAME } from '../../command';
 import { LONG_FLAG_PREFIX, SHORT_FLAG_PREFIX } from '../../flag';
 import { Option, OptionDefinitionList } from '../../option';
@@ -23,7 +24,7 @@ export const formatOption = (option: Option): string | undefined => {
     return format;
 };
 
-export const HELP: CommandHandler<OptionDefinitionList> = (parser) => {
+export const HELP: CommandHandler<OptionDefinitionList, ArgumentDefinitionList> = (parser) => {
 
     const program = '<program>';
 

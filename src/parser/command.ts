@@ -1,4 +1,5 @@
-import { OptionDefinition, OptionDefinitionList } from './option';
+import { ArgumentConfig, ArgumentDefinitionList } from './argument';
+import { OptionConfig, OptionDefinitionList } from './option';
 
 /**
  * An enum for different types of CommandDefinitions.
@@ -11,8 +12,8 @@ export const enum CommandType {
 /**
  * A CommandHandler is the actual function which is executed when a command is run.
  */
-export interface CommandHandler<T extends OptionDefinitionList> {
-    (parser: CommandParser<T>): Promise<void> | void;
+export interface CommandHandler<O extends OptionDefinitionList, A extends ArgumentDefinitionList> {
+    (parser: CommandParser<O, A>): Promise<void> | void;
 }
 
 /**
@@ -23,9 +24,9 @@ export interface CommandHandler<T extends OptionDefinitionList> {
  *
  * @internal
  */
-interface BaseCommandDefinition<T extends OptionDefinitionList> {
+interface BaseCommandDefinition<O extends OptionDefinitionList, A extends ArgumentDefinitionList> {
     type: CommandType;
-    handler: CommandHandler<T>;
+    handler: CommandHandler<O, A>;
     name?: string;
     alias?: string | string[];
     short?: string | string[];
@@ -37,26 +38,44 @@ interface BaseCommandDefinition<T extends OptionDefinitionList> {
  * A SharedCommandDefinition describes a command which uses the same CommandParser
  * instance as its parent command.
  */
-export interface SharedCommandDefinition<T extends OptionDefinitionList> extends BaseCommandDefinition<T> {
+export interface SharedCommandDefinition<
+    O extends OptionDefinitionList = OptionDefinitionList,
+    A extends ArgumentDefinitionList = ArgumentDefinitionList
+> extends BaseCommandDefinition<O, A> {
     type: CommandType.SHARED;
-    commands?: CommandDefinitionList<T>;
+    commands?: CommandDefinitionList<O, A>;
 }
 
 /**
  * An IsolatedCommandDefinition describes a command which uses its own instance of
  * a CommandParser.
  */
-export interface IsolatedCommandDefinition<T extends OptionDefinitionList> extends BaseCommandDefinition<T> {
+export interface IsolatedCommandDefinition<
+    O extends OptionDefinitionList = OptionDefinitionList,
+    A extends ArgumentDefinitionList = ArgumentDefinitionList
+> extends BaseCommandDefinition<O, A> {
     type: CommandType.ISOLATED;
     name: string;
-    options?: T;
-    commands?: CommandDefinitionList<T> | BuiltinCommandDefinitionList;
+    options?: O;
+    arguments?: A,
+    commands?: CommandDefinitionList<O, A> | BuiltinCommandDefinitionList;
 }
 
 /**
  * A CommandDefinition describes a command for the CommandParser.
  */
-export type CommandDefinition<T extends OptionDefinitionList> = IsolatedCommandDefinition<T> | SharedCommandDefinition<T>;
+export type CommandDefinition<
+    O extends OptionDefinitionList = OptionDefinitionList,
+    A extends ArgumentDefinitionList = ArgumentDefinitionList
+> = IsolatedCommandDefinition<O, A> | SharedCommandDefinition<O, A>;
+
+/**
+ * A CommandDefinitionList is a record of SharedCommandDefinitions with the
+ * record's keys corresponding to each command's name property.
+ */
+export interface CommandDefinitionList<O extends OptionDefinitionList, A extends ArgumentDefinitionList> {
+    [key: string]: SharedCommandDefinition<O, A>;
+}
 
 /**
  * A Command is a runtime description of a command for the CommandParser.
@@ -64,15 +83,10 @@ export type CommandDefinition<T extends OptionDefinitionList> = IsolatedCommandD
  * @remarks
  * A Command will always have a name.
  */
-export type Command<T extends OptionDefinitionList> = IsolatedCommandDefinition<T> | (SharedCommandDefinition<T> & { name: string; });
-
-/**
- * A CommandDefinitionList is a record of SharedCommandDefinitions with the
- * record's keys corresponding to each command's name property.
- */
-export interface CommandDefinitionList<T extends OptionDefinitionList> {
-    [key: string]: SharedCommandDefinition<T>;
-}
+export type Command<
+    O extends OptionDefinitionList = OptionDefinitionList,
+    A extends ArgumentDefinitionList = ArgumentDefinitionList
+> = IsolatedCommandDefinition<O, A> | (SharedCommandDefinition<O, A> & { name: string; });
 
 export const HELP_COMMAND_NAME = 'help';
 
@@ -88,17 +102,9 @@ export const VERSION_COMMAND_NAME = 'version';
  * setting the appropriate key to `null`.
  */
 export interface BuiltinCommandDefinitionList {
-    [HELP_COMMAND_NAME]?: SharedCommandDefinition<OptionDefinitionList> | null;
-    [VERSION_COMMAND_NAME]?: SharedCommandDefinition<OptionDefinitionList> | null;
+    [HELP_COMMAND_NAME]?: SharedCommandDefinition | null;
+    [VERSION_COMMAND_NAME]?: SharedCommandDefinition | null;
 }
-
-/**
- * A CommandConfig is the configuration type derived from a CommandDefinition's
- * OptionDefinitionList.
- */
-export type CommandConfig<T extends OptionDefinitionList> = {
-    [P in keyof T]: T[P] extends OptionDefinition<infer R> ? R : unknown;
-};
 
 /**
  * A CommandParser provides access to the parsing result of a CommandDefinition
@@ -108,15 +114,15 @@ export type CommandConfig<T extends OptionDefinitionList> = {
  * The CliParser class implements the CommandParser interface. We don't want to
  * directly depend on the CliParser class to prevent cyclic dependencies.
  */
-export interface CommandParser<T extends OptionDefinitionList> {
+export interface CommandParser<O extends OptionDefinitionList, A extends ArgumentDefinitionList = ArgumentDefinitionList> {
 
-    definition: IsolatedCommandDefinition<T>;
+    definition: IsolatedCommandDefinition<O, A>;
 
-    arguments (): string[];
+    arguments (): Partial<ArgumentConfig<A>>;
 
-    options (): Partial<CommandConfig<T>>;
+    options (): Partial<OptionConfig<O>>;
 
-    config (): CommandConfig<T>;
+    config (): OptionConfig<O>;
 }
 
 /**
@@ -160,9 +166,9 @@ export interface CommandParser<T extends OptionDefinitionList> {
  * ```
  * @param command - The command definition object
  */
-export function command<T extends OptionDefinitionList> (command: SharedCommandDefinition<T>): SharedCommandDefinition<T>;
-export function command<T extends OptionDefinitionList> (command: IsolatedCommandDefinition<T>): IsolatedCommandDefinition<T>;
-export function command<T extends OptionDefinitionList> (command: CommandDefinition<T>): CommandDefinition<T> {
+export function command<O extends OptionDefinitionList, A extends ArgumentDefinitionList> (command: SharedCommandDefinition<O, A>): SharedCommandDefinition<O, A>;
+export function command<O extends OptionDefinitionList, A extends ArgumentDefinitionList> (command: IsolatedCommandDefinition<O, A>): IsolatedCommandDefinition<O, A>;
+export function command<O extends OptionDefinitionList, A extends ArgumentDefinitionList> (command: CommandDefinition<O, A>): CommandDefinition<O, A> {
 
     return { ...command };
 }

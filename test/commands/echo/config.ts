@@ -26,10 +26,12 @@ export const ECHO_ARGUMENTS = args(
     {
         parse: ARRAY(STRING),
         name: 'words',
+        required: true,
     },
     {
         parse: NUMBER,
         name: 'which',
+        default: 0,
     },
 );
 

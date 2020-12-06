@@ -403,8 +403,13 @@ export class CliParser<O extends OptionDefinitionList, A extends ArgumentDefinit
 
         return {
             command,
-            arguments: args,
             options,
+            arguments: [
+                // merge the default argument values...
+                ...this.createDefaultArguments()
+                    // ...and the cli provided argument values
+                    .map((arg, index) => args[index] !== undefined ? args[index] : arg),
+            ] as Partial<ArgumentConfig<A>>,
             config: {
                 // merge the default option values...
                 ...this.createDefaultConfig(),
@@ -412,6 +417,11 @@ export class CliParser<O extends OptionDefinitionList, A extends ArgumentDefinit
                 ...options,
             },
         };
+    }
+
+    protected createDefaultArguments (): ArgumentConfig<A> {
+
+        return this._arguments.map(argument => argument.default) as ArgumentConfig<A>;
     }
 
     protected createDefaultConfig (): OptionConfig<O> {

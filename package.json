@@ -19,7 +19,7 @@
     "process"
   ],
   "author": "Alexander Wende",
-  "license": "MIT",
+  "license": "BSD-3-Clause",
   "devDependencies": {
     "@partkit/eslint-config": "^0.1.3",
     "@types/node": "^14.14.6",

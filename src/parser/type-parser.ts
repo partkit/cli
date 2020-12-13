@@ -28,17 +28,17 @@ export const BOOLEAN = createTypeParser<boolean>(
     'boolean',
 );
 
-export const ARRAY = <T extends unknown> (parser: TypeParser<T>): TypeParser<Exclude<T, undefined>[]> => {
+export const ARRAY = <T extends unknown> (parser: TypeParser<T>, separator = ','): TypeParser<Exclude<T, undefined>[]> => {
 
     return createTypeParser<Exclude<T, undefined>[]>(
         (value) => {
 
             return isEmpty(value)
                 ? undefined
-                : value.split(',')
+                : value.split(separator)
                     .map(val => parser(val))
                     .filter(val => val !== undefined) as Exclude<T, undefined>[];
         },
-        `${ parser.hint }[]`,
+        `${ parser.hint }${ separator }...`,
     );
 };

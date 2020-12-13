@@ -7,9 +7,8 @@ export const ECHO_COMMAND = command({
     handler: ECHO,
     arguments: ECHO_ARGUMENTS,
     options: ECHO_OPTIONS,
-    // disable `help` and `version` commands for the echo command
+    // disable `version` commands for the echo command
     commands: {
-        help: null,
         version: null,
     },
     name: 'echo',

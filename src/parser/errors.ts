@@ -30,8 +30,17 @@ export const INVALID_COMMAND = (command: string, parent?: string): ParserError =
         ? `sub-command of '${ parent }'`
         : 'command' }.`);
 
+export const INVALID_ARGUMENT = (argument: string, command: string): ParserError =>
+    new ParserError(`Invalid argument. '${ argument }' is not a valid argument of command '${ command }'.`);
+
 export const INVALID_OPTION = (option: string, command: string): ParserError =>
     new ParserError(`Invalid option. '${ option }' is not a valid option of command '${ command }'.`);
+
+export const MISSING_ARGUMENT = (argument: string[], command: string): ParserError =>
+    new ParserError(`Missing arguments. ${ argument.map(val => `'${ val }'`).join(', ') } ${ argument.length ? 'are required arguments' : 'is a required argument' } of command '${ command }'.`);
+
+export const MISSING_OPTION = (option: string[], command: string): ParserError =>
+    new ParserError(`Missing options. ${ option.map(val => `'${ val }'`).join(', ') } ${ option.length ? 'are required options' : 'is a required option' } of command '${ command }'.`);
 
 export const INVALID_USAGE = <T extends OptionDefinitionList> (parser: CommandParser<T>, api: string): UsageError =>
     new UsageError(`Invalid usage. Make sure to call '${ parser.constructor.name }.run()' before calling '${ parser.constructor.name }.${ api }()'.`);

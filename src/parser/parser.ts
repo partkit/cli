@@ -20,9 +20,12 @@ import {
     DUPLICATE_COMMAND,
     DUPLICATE_OPTION,
     DUPLICATE_PARSER,
+    INVALID_ARGUMENT,
     INVALID_COMMAND,
     INVALID_OPTION,
     INVALID_USAGE,
+    MISSING_ARGUMENT,
+    MISSING_OPTION,
     ParserError,
     SilentError,
 } from './errors';
@@ -223,7 +226,7 @@ export class CliParser<O extends OptionDefinitionList, A extends ArgumentDefinit
 
                 } else {
 
-                    // if a registered command was matched get the command's parser...
+                    // if an isolated command was matched get the command's parser...
                     const parser = this._parsers[matchedCommand.name];
 
                     // ...and run it with the updated arguments array
@@ -343,18 +346,25 @@ export class CliParser<O extends OptionDefinitionList, A extends ArgumentDefinit
 
                 if (!currFlag) {
 
-                    // if the `curr` argument is not an option, push it in the
-                    // result's arguments array
+                    // if the `curr` argument is not a flag retrieve it from the arguments lookup array
+                    // arguments are positional, so the index of the definition coincides with the index
+                    // of already parsed arguments
                     const argument = this._arguments[args.length];
 
-                    // TODO: should we error if there's no argument definition?
-                    // TODO: handle argument default values
-                    args.push(argument ? argument.parse(curr) : curr);
+                    if (!argument) {
+
+                        throw INVALID_ARGUMENT(curr, this.definition.name);
+                    }
+
+                    // set the argument's value by invoking its type parser
+                    argument.value = argument.parse(curr);
+
+                    // store the argument in the result's args array
+                    args.push(argument.value);
 
                 } else {
 
-                    // if the `curr` argument is an option (a flag) retrieve it
-                    // from the options lookup map
+                    // if the `curr` argument is a flag retrieve it from the options lookup map
                     const option = this._optionLookup.get(curr);
 
                     if (!option) {
@@ -363,9 +373,11 @@ export class CliParser<O extends OptionDefinitionList, A extends ArgumentDefinit
                         throw INVALID_OPTION(curr, this.definition.name);
                     }
 
+                    const currNeg = isNegatedFlag(curr);
+
                     // for negated flags (--no-<option>) we set the value to `undefined`
                     // a TypeParser should handle `undefined` values appropriately
-                    const value = isNegatedFlag(curr)
+                    const value = currNeg
                         ? undefined
                         : !nextFlag
                             ? next ?? ''
@@ -381,9 +393,35 @@ export class CliParser<O extends OptionDefinitionList, A extends ArgumentDefinit
 
                     // if the `next` argument was used as option value we can skip
                     // it in the next parsing iteration by incrementing `i` by `1`
-                    i += !nextFlag ? 1 : 0;
+                    i += !currNeg && !nextFlag ? 1 : 0;
                 }
             }
+        }
+
+        const missingArguments = this._arguments.reduce((missing, arg, index) => {
+
+            if (arg.required && index >= args.length) missing.push(arg.name || index.toString());
+
+            return missing;
+
+        }, [] as string[]);
+
+        if (missingArguments.length) {
+
+            throw MISSING_ARGUMENT(missingArguments, this.definition.name);
+        }
+
+        const missingOptions = Object.entries(this._options).reduce((missing, [name, option]) => {
+
+            if (option.required && !(name in options)) missing.push(name);
+
+            return missing;
+
+        }, [] as string[]);
+
+        if (missingOptions.length) {
+
+            throw MISSING_OPTION(missingOptions, this.definition.name);
         }
 
         // after parsing the arguments array create a parser result
@@ -408,7 +446,7 @@ export class CliParser<O extends OptionDefinitionList, A extends ArgumentDefinit
                 // merge the default argument values...
                 ...this.createDefaultArguments()
                     // ...and the cli provided argument values
-                    .map((arg, index) => args[index] !== undefined ? args[index] : arg),
+                    .map((arg, index) => args.length > index ? args[index] : arg),
             ] as Partial<ArgumentConfig<A>>,
             config: {
                 // merge the default option values...
